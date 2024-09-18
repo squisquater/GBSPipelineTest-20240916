@@ -15,6 +15,6 @@
 !modules/**
 
 # Unignore specific files in the root directory
-!00.snakefile_master
+!00.snakefile_main
 !.gitignore
 !README.md
