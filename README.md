@@ -17,31 +17,69 @@ This Snakemake workflow automates the process of aligning genomic reads, identif
 ## Directory Structure
 
 ```plaintext
-├── 00.snakefile_master                 # Master Snakemake file that coordinates the entire workflow
-├── accessory_scripts                   # Custom scripts for various steps in the pipeline
-│   ├── GenDist.R                       # Script for generating distance matrices and heatmaps
-│   ├── admixture_metrics.R             # Script for summarizing ADMIXTURE CV errors
-│   ├── plot_admixture_barplots.R       # Script for plotting ADMIXTURE results
-│   └── (other R/Python scripts)        # Additional scripts for specific tasks (e.g., isolation by distance, population centroids)
-├── config                              # Configuration files for each module
+.
+├── 00.snakefile_main
+├── README.md
+├── accessory_scripts
+│   ├── GENHETv3.1.R
+│   ├── GenDist.R
+│   ├── admixture_metrics.R
+│   ├── allelic_balance.py
+│   ├── append_population.py
+│   ├── calculate_ind_centroids.R
+│   ├── calculate_pop_centroids.R
+│   ├── compare_replicates.R
+│   ├── export_coords.py
+│   ├── extract_sample_coords.py
+│   ├── feems_spatial_graph.py
+│   ├── fit_feems.py
+│   ├── generate_concave_hull.py
+│   ├── generate_popmap.py
+│   ├── genhet_vs_depth.R
+│   ├── isolation_by_distance.R
+│   ├── mds_plot.R
+│   ├── merge_centroids_with_fam.py
+│   ├── pca_plot.R
+│   ├── ped2genhet.py
+│   ├── plot_admixture_barplots.R
+│   ├── plot_genhet_barplots.R
+│   ├── plot_genhet_vs_depth.R
+│   ├── plot_polygon.py
+│   ├── rename_chromosomes.py
+│   └── summarize_admixture_qvalues.R
+├── config
 │   ├── 01.snakefile_alignPE.yml
 │   ├── 02.snakefile_stacks.yml
 │   ├── 04.snakefile_admixture.yml
-│   └── 06.snakefile_landgen.yml
-├── envs                                # Conda environment files
+│   ├── 05.snakefile_genhet.yml
+│   ├── 06.snakefile_landgen.yml
+│   └── 07.snakefile_feems.yml
+├── envs
 │   ├── GBS.yml
 │   ├── LandGen.yml
-│   ├── snakemake.yml                   # Snakemake environment configuration
-│   └── (other .yml files)
-├── input_files                         # Input files for analysis
-│   ├── SJKF_cleaned_database_n484.txt  # Master database containing sample information
-│   ├── hexgrid5km.shp                  # Hexagonal grid shapefiles for landscape genetics (can be customized)
-│   └── (additional input files)
-├── modules                             # Subdirectories containing Snakemake workflows for each analysis module
-│   ├── alignPE
-│   ├── stacks
-│   ├── admixture
-│   └── landgen
+│   ├── alphashape.yml
+│   ├── bcftools.yml
+│   ├── cowplot.yml
+│   ├── feems.yml
+│   └── snakemake.yml
+├── input_files
+│   ├── MasterDB_test.txt
+│   ├── hexgrid10km.shp
+│   ├── hexgrid10km.shx
+│   ├── hexgrid5km.shp
+│   └── hexgrid5km.shx
+└── modules
+    ├── admixture
+    │   └── 04.snakefile_admixture
+    ├── alignPE
+    │   └── 01.snakefile_alignPE
+    ├── feems
+    │   └── 07.snakefile_FEEMS
+    ├── genhet
+    │   └── 05.snakefile_genhet
+    ├── landgen
+    │   └── 06.snakefile_landgen
+    └── stacks
 ```
 ## Getting Started
 
@@ -49,9 +87,9 @@ This Snakemake workflow automates the process of aligning genomic reads, identif
 
 First, clone the repository from GitHub to your local machine:
 ```
-git clone https://github.com/squisquater/KitFoxGBS-PipelineTest20240910.git
+git clone https://github.com/squisquater/KitFoxGBS-PipelineTest20240916.git
 
-cd KitFoxGBS-PipelineTest20240910
+cd KitFoxGBS-PipelineTest20240916
 ```
 
 ### 2. Set Up Conda Environment
@@ -68,8 +106,8 @@ The pipeline will automatically create other necessary Conda environments as it 
 
 Place your input files in the input_files/ directory. Key files include:
 
-- **Master Database:** See [SJKF_cleaned_database_n484.txt]() as an example but your master database file must contain at least 3 columns ('Individual.ID', 'Library.ID', 'and 'Region.ID') in order to run the alignment and stacks pipelines. If you want to run the LandGen pipeline you will also need a 'Lat' and 'Long' column. 
-- **Shapefiles:** Hexagonal grid shapefiles for landscape genetics pipeline (hexgrid5km.shp, hexgrid10km.shp). If your project spans outside California or uses a different region, replace these shapefiles with your own.
+- **Master Database:** See [MasterDB_test.txt]() as an example but your master database file must contain at least 3 columns ('Individual.ID', 'Library.ID', 'and 'Region.ID') in order to run the alignment and stacks pipelines. If you want to run the LandGen pipeline you will also need a 'Lat' and 'Long' column. 
+- **Shapefiles:** Hexagonal grid shapefiles for landscape genetics pipeline (hexgrid5km.shp, hexgrid10km.shp). If your project spans outside California or uses a different region, replace these shapefiles with your own. (NOTE: At the moment feems isn't working in this pipeline anyways so these files aren't super useful)
 
 ### 4. Modify Configuration Files
 
@@ -85,6 +123,7 @@ Modify the paths to your input files, set parameters like depth thresholds, and 
 01.snakefile_alignPE.yml: Defines paths for read alignment, reference genome, and sample metadata.
 02.snakefile_stacks.yml: Defines settings for SNP calling, population mapping, and filtering.
 04.snakefile_admixture.yml: Defines the K-values range for ADMIXTURE analysis.
+05.snakefile_genhet.yml: Defines parameters for running genetic diversity adn inbreeding stats.
 06.snakefile_landgen.yml: Defines settings for landscape genetics, including IBD analysis.
 
 
@@ -123,6 +162,7 @@ After running the workflow, the output will include:
 - VCF files containing SNPs.
 - PLINK files for population genetics analysis.
 - ADMIXTURE results including Q-value summaries and bar plots.
+- Genetic diversity and inbreeding across populations/regions.
 - Distance matrices (FST and Nei’s D) and heatmaps for landscape genetics.
 - Isolation-by-distance plots from the Mantel test.
 
