@@ -80,6 +80,7 @@ This Snakemake workflow automates the process of aligning genomic reads, identif
     ├── landgen
     │   └── 06.snakefile_landgen
     └── stacks
+        └── 02.snakefile_stacks
 ```
 ## Getting Started
 
