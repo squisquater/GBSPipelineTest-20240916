@@ -120,11 +120,11 @@ Modify the paths to your input files, set parameters like depth thresholds, and 
 
 ## Key Config Files:
 
-01.snakefile_alignPE.yml: Defines paths for read alignment, reference genome, and sample metadata.
-02.snakefile_stacks.yml: Defines settings for SNP calling, population mapping, and filtering.
-04.snakefile_admixture.yml: Defines the K-values range for ADMIXTURE analysis.
-05.snakefile_genhet.yml: Defines parameters for running genetic diversity adn inbreeding stats.
-06.snakefile_landgen.yml: Defines settings for landscape genetics, including IBD analysis.
+* 01.snakefile_alignPE.yml: Defines paths for read alignment, reference genome, and sample metadata.
+* 02.snakefile_stacks.yml: Defines settings for SNP calling, population mapping, and filtering.
+* 04.snakefile_admixture.yml: Defines the K-values range for ADMIXTURE analysis.
+* 05.snakefile_genhet.yml: Defines parameters for running genetic diversity adn inbreeding stats.
+* 06.snakefile_landgen.yml: Defines settings for landscape genetics, including IBD analysis.
 
 
 Make sure all file paths and parameters match your data and desired analysis.
