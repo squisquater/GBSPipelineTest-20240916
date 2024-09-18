@@ -1,0 +1,10 @@
+name: cowplot
+channels:
+  - conda-forge
+dependencies:
+  - r-base=4.2.0  # You can specify a specific R version if needed
+  - r-ggplot2
+  - r-dplyr
+  - r-cowplot
+  - r-tidyr
+  - r-tidyverse  # Optional, includes other helpful tidy packages

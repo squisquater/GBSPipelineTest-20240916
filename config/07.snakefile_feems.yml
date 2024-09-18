@@ -1,0 +1,11 @@
+# parameters for buffering around datapoints
+alpha: 0.4  # List of values for alpha
+buffer_distance: 0.4  # List of values for buffer distance
+
+## these are for use in the feems analysis.
+
+### name of grid file
+#grid_file: "hexgrid5km"
+
+# parameters for buffering around datapoints
+#lambda_val: 20.0  # List of values for lambda smoothing parameter

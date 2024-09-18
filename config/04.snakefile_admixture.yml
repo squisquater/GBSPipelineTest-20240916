@@ -1,0 +1,6 @@
+K_start: 1
+K_end: 5
+
+admixture:
+  bootstrap: 2000
+  CV: 10

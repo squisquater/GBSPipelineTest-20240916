@@ -1,0 +1,88 @@
+# Define resources and paths in the configuration file
+configfile: "config/05.snakefile_genhet.yml"
+
+# create a genhet directory
+config['genhet_dir'] = f"{config['populations_dir']}/genhet"
+
+rule all_GenHet:
+    input:
+        f"{config['genhet_dir']}/genhet_input.txt",
+        f"{config['genhet_dir']}/genhet_output.txt",
+        #f"{config['genhet_dir']}/heterozygosity_vs_depth.png",
+        #f"{config['genhet_dir']}/heterozygosity_barplot.png"
+
+rule plink_to_genhet:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input:
+        ped = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.ped",
+        map = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.map"
+    output:
+        genhet = f"{config['genhet_dir']}/genhet_input.txt",
+        loci = f"{config['genhet_dir']}/genhet_loci.txt"
+    conda: "../../envs/GBS.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/ped2genhet.py"
+
+rule run_genhet_analysis:
+    resources:
+        mem_mb = lambda wildcards, attempt: 2 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input:
+        genhet = f"{config['genhet_dir']}/genhet_input.txt",
+        loci = f"{config['genhet_dir']}/genhet_loci.txt"
+    output:
+        genhet_output = f"{config['genhet_dir']}/genhet_output.txt"
+    params:
+        estimfreq = config['estimfreq']
+    conda: "../../envs/GBS.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/GENHETv3.1.R"
+
+rule genhetStats_vs_depth:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input:
+        genhet = f"{config['genhet_dir']}/genhet_output.txt",
+        depth = f"{config['qcmetrics_dir']}/depthsummary_unique.txt",
+        fam = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.fam"
+    output:
+        merged = f"{config['genhet_dir']}/genhet_vs_depth.txt"
+    conda: "../../envs/cowplot.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/genhet_vs_depth.R"
+
+rule plot_heterozygosity_vs_depth:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input:
+        merged = f"{config['genhet_dir']}/genhet_vs_depth.txt"
+    output:
+        plot = f"{config['genhet_dir']}/genhet_vs_depth.png",
+        results = f"{config['genhet_dir']}/genhet_vs_depth_corr.txt"
+    conda: "../../envs/cowplot.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/plot_genhet_vs_depth.R"
+
+
+rule plot_genhet_barplots:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input:
+        merged = f"{config['genhet_dir']}/genhet_vs_depth.txt"
+    output:
+        plot = f"{config['genhet_dir']}/genhet_barplots.png",
+        summary = f"{config['genhet_dir']}/genhet_summary.txt"
+    conda: "../../envs/cowplot.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/plot_genhet_barplots.R"
+

@@ -1,0 +1,80 @@
+configfile: "config/07.snakefile_FEEMS.yml"
+
+# Update the file paths in the config dictionary
+config['feems_dir'] = f"{config['landgen_dir']}/feems"  # Directory for FEEMS output files
+
+rule all_feems:
+    input:
+        f"{config['feems_dir']}/smoothed_buffered_polygon_alpha{config['alpha']}_buffer{config['buffer_distance']}.png",
+        f"{config['feems_dir']}/SJKF.outer_alpha{config['alpha']}_buffer{config['buffer_distance']}.txt",
+        f"{config['feems_dir']}/SJKF.coord",
+        #f"{config['feems_dir']}/output_fitfeems_lam{config['lambda_val']}_SJKF_hexgrid5km_buffer{config['buffer_distance']}.png"
+
+rule generate_concave_hull:
+    resources:
+        mem_mb = 2 * 1024,
+        time = 1 * 60,
+        partition = "bmh"
+    input:
+        centroids = f"{config['landgen_dir']}/individual_centroids.csv"
+    output:
+        polygon_img = f"{config['feems_dir']}/smoothed_buffered_polygon_alpha{config['alpha']}_buffer{config['buffer_distance']}.png",
+        outer_coords = f"{config['feems_dir']}/SJKF.outer_alpha{config['alpha']}_buffer{config['buffer_distance']}.txt"
+    params:
+        alpha = config['alpha'],
+        buffer_distance = config['buffer_distance']
+    conda: "../../envs/feems.yml"
+    script:
+        '/accessory_scripts/generate_concave_hull.py'
+
+rule export_coords:
+    resources:
+        mem_mb = 2 * 1024,
+        time = 1 * 60,
+        partition = "bmh"
+    input:
+        centroids = f"{config['landgen_dir']}/individual_centroids.csv"
+    output:
+        coord = f"{config['feems_dir']}/SJKF.coord"
+    conda: "../../envs/feems.yml"
+    script:
+        '/accessory_scripts/export_coords.py'
+
+
+############ Currently I can't get feems to run in a snakemake workflow, so I'm commenting out the rules below for now ############
+############ In the meantime you can run these python scripts manually outside of snakemake ############
+
+#rule feems_spatial_graph:
+#    resources:
+#        mem_mb = 10 * 1024,
+#        time = 2 * 60,
+#        partition = "bmh"
+#    input:
+#        coord = f"{config['feems_dir']}/SJKF.coord",
+#        outer = f"{config['feems_dir']}/SJKF.outer_alpha{config['alpha']}_buffer{config['buffer_distance']}.txt",
+#        grid = f"{input_files}/{config['grid_file']}.shp"
+#    output:
+#        graph_img = f"{config['feems_dir']}/output_spatialgraphobject_SJKF_hexgrid5km_buffer{config['buffer_distance']}.png"
+#    params:
+#        buffer_distance = config['buffer_distance']
+#    conda: "../../envs/feems.yml"
+#    script:
+#        '/accessory_scripts/feems_spatial_graph.py'
+
+#rule fit_feems:
+#    resources:
+#        mem_mb = 20 * 1024,
+#        time = 3 * 60,
+#        partition = "bmh"
+#    input:
+#        graph_img = f"{config['feems_dir']}/output_spatialgraphobject_SJKF_hexgrid5km_buffer{config['buffer_distance']}.png",
+#        coord = f"{config['feems_dir']}/SJKF.coord",
+#        outer = f"{config['feems_dir']}/SJKF.outer_alpha{config['alpha']}_buffer{config['buffer_distance']}.txt",
+#        grid = f"{input_files}/{config['grid_file']}.shp"  # Correct reference to grid_file
+#    output:
+#        feems_img = f"{config['feems_dir']}/output_fitfeems_lam{config['lambda_val']}_SJKF_hexgrid5km_buffer{config['buffer_distance']}.png"
+#    params:
+#        lambda_val = config['lambda_val']
+#    conda:  "../../envs/feems.yml"
+#    script:
+#        '/accessory_scripts/fit_feems.py'

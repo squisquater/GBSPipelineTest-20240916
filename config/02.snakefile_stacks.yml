@@ -1,0 +1,21 @@
+depth_threshold: 15  # Set the threshold for mean depth filtering
+
+# Populations Run
+populations_run: "RedRuppells_15x_singleSNP.ordered.AB0.2"
+
+# Populations parameters
+populations:
+  min_maf: 0.05  # Minimum minor allele frequency
+  max_obs_het: 0.6  # Maximum observed heterozygosity
+  min_samples_overall: 0.8  # Minimum proportion of samples required to process a locus
+
+# Allelic balance correction parameters
+allelicBalance:
+  p_value: 0.01  # P-value threshold for allelic balance correction
+  ratio: 0.2  # Ratio for allelic balance correction
+
+# bcftools parameters
+bcftools:
+  missingness: 0.2  # Maximum proportion of missing data allowed per locus
+  mind_threshold: 0.2  # Maximum proportion of missing data allowed per individual
+  min_samples_per_pop: 4  # Minimum number of individuals per pop to use in down stream LandGen analyes.

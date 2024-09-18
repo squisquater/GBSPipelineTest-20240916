@@ -1,0 +1,365 @@
+configfile: "config/01.snakefile_alignPE.yml"   
+
+# Access home directory from the config file
+home_dir = config['home_dir']
+
+# Data Directory
+data_dir = config['data_dir']
+
+# Input Files
+input_files = f"{home_dir}/input_files"
+
+# Access sample information from the master database 
+samples = f"{input_files}/{config['masterDB']}"
+
+##Update paths in the config dictionary
+config['fastq_dir'] = f"{config['data_dir']}" ## Directory to read fastq files
+config['output_dir'] = f"{config['home_dir']}/output_files" ## Directory to write output files  
+config['aligned_dir'] = f"{config['output_dir']}/aligned/{config['reference_nickname']}" ## Directory to write aligned files
+config['readgroup_dir'] = f"{config['output_dir']}/aligned/{config['reference_nickname']}/newreadgroups" ## Directory to write new readgroup files
+config['library_qcmetrics_dir'] = f"{config['output_dir']}/aligned/{config['reference_nickname']}/newreadgroups/qcmetrics" ## Directory to write qcmetrics files
+config['check_IBS'] = f"{config['output_dir']}/aligned/{config['reference_nickname']}/newreadgroups/check_IBS" ## Directory to write check_IBS files  
+config['merge_dir'] = f"{config['output_dir']}/aligned/{config['reference_nickname']}/newreadgroups/merged_bams" ## Directory to write merged bam files
+config['qcmetrics_dir'] = f"{config['output_dir']}/aligned/{config['reference_nickname']}/newreadgroups/merged_bams/qcmetrics" ## Directory to write qcmetrics files
+config['scratch_dir'] = f"{config['output_dir']}/scratch" ## Directory to write scratch files
+config['accessory_scripts_dir'] = f"{config['home_dir']}/accessory_scripts" ## Directory containing accessory scripts
+
+#print(samples)
+
+import csv
+
+# Open the updated sample file (master database) and parse relevant columns
+with open(samples, "rt") as file:
+    reader = csv.DictReader(file, delimiter='\t')  # Assuming tab-delimited file
+    SAMPLES = [row['Individual.ID'] for row in reader if 'Individual.ID' in row]
+    
+# Re-open the file to ensure the reader starts at the beginning
+with open(samples, "rt") as file:
+    reader = csv.DictReader(file, delimiter='\t')
+    LIBRARIES = [row['Library.ID'] for row in reader if 'Library.ID' in row]
+
+# Create a dictionary mapping libraries to samples
+library_to_sample = dict(zip(LIBRARIES, SAMPLES))
+
+
+#print(library_to_sample)
+
+rule all_align:
+    input:
+     expand(f"{config['qcmetrics_dir']}/{{sample}}_summaryMetrics.txt", sample=SAMPLES), \
+     f"{config['qcmetrics_dir']}/depthsummary_unique.txt", \
+     f"{config['check_IBS']}/CheckIBS.genome", \
+     f"{config['check_IBS']}/max_pi_hat_comparisons.csv", \
+     f"{config['library_qcmetrics_dir']}/library_depth_summary.txt"
+
+wildcard_constraints:
+    library="[^/]+"
+
+rule map_reads:
+    resources:
+        mem_mb = lambda wildcards, attempt: 10 * 1024 * attempt,
+        time = lambda wildcards, attempt: 6 * 60 * attempt,
+        partition = "bmh"
+    input: 
+        fastq=f"{config['fastq_dir']}/{{library}}.assembled.fastq"
+    output: temp(f"{config['aligned_dir']}/{{library}}.bam")
+    params:
+        reference=config['reference_file'],
+        scratch=f"{config['scratch_dir']}/{{library}}_tmp",
+        sam_flag=config['samtools']['flag'],
+        sam_mapq=config['samtools']['mapq']
+    conda: "../../envs/GBS.yml"
+    shell:"""
+        mkdir -p {params.scratch}
+        bwa mem {params.reference} {input.fastq} | samtools view -F {params.sam_flag} -q {params.sam_mapq} -h -b - | samtools sort -T {params.scratch} -o {output}
+        rm -r {params.scratch}
+    """
+
+rule add_readgroups:
+    resources:
+        mem_mb = lambda wildcards, attempt: 5 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input: f"{config['aligned_dir']}/{{library}}.bam"
+    output: f"{config['readgroup_dir']}/{{library}}.bam"
+    params:
+        RGID= lambda w: library_to_sample[w.library],
+        RGLB="{library}",
+        RGPL="ILLUMINA",
+        RGPU="NULL",
+        RGSM=lambda w: library_to_sample[w.library]
+    conda: "../../envs/GBS.yml"
+    shell:"""
+        picard AddOrReplaceReadGroups \
+        I={input} \
+        O={output} \
+        RGID={params.RGID}, RGLB={params.RGLB}, RGPL={params.RGPL}, RGPU={params.RGPU}, RGSM={params.RGSM} \
+        VALIDATION_STRINGENCY=LENIENT
+    """
+
+rule index_bams_per_library:
+    resources:
+        mem_mb = 2 * 1024,
+        time = 1 * 60,
+        partition = "bmh"
+    input: f"{config['readgroup_dir']}/{{library}}.bam"
+    output: f"{config['readgroup_dir']}/{{library}}.bam.bai"
+    conda: "../../envs/GBS.yml"
+    shell:"""
+        samtools index {input}
+    """
+
+rule get_library_depths:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input: 
+        bam=f"{config['readgroup_dir']}/{{library}}.bam",
+        bai=f"{config['readgroup_dir']}/{{library}}.bam.bai"
+    output: f"{config['library_qcmetrics_dir']}/{{library}}.genomic.depth.summary.txt"
+    conda: "../../envs/GBS.yml"
+    shell:"""   
+    samtools depth {input.bam} | awk '{{sum+=$3; count++}} END {{if (count > 0) print sum/count; else print \"NA\"}}' > {output}
+    """
+
+rule summarize_library_depths:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 20 * attempt,
+        partition = "bmh"
+    input: 
+        genomic=expand(f"{config['library_qcmetrics_dir']}/{{library}}.genomic.depth.summary.txt", library=LIBRARIES)
+    output: f"{config['library_qcmetrics_dir']}/library_depth_summary.txt"
+    conda: "../../envs/GBS.yml"
+    shell: """
+        echo -e "BamFile\tGenomeWideAvgDepth" > {output}
+        for library in {input}; do
+            library_name=$(basename $library .genomic.depth.summary.txt)
+            genomic_depth=$(cat $library | head -n 1)
+            echo -e "$library_name\t$genomic_depth" >> {output}
+        done
+    """
+
+
+rule make_bamlist:
+    resources:
+        mem_mb = 5 * 1024,
+        time = 1 * 60,
+        partition = "bmh"
+    input: 
+        bam=expand(f"{config['readgroup_dir']}/{{library}}.bam", library=LIBRARIES),
+        bai=expand(f"{config['readgroup_dir']}/{{library}}.bam.bai", library=LIBRARIES)
+    output: f"{config['check_IBS']}/bam_list.txt"
+    conda: "../../envs/GBS.yml"
+    shell:"""
+        # Create a text file with the list of BAM files
+        printf '%s\n' {input.bam} > {output}
+    """
+
+rule make_replicate_key:
+    resources:
+        mem_mb = 5 * 1024,
+        time = 1 * 60,
+        partition = "bmh"
+    input:
+        bam=expand(f"{config['readgroup_dir']}/{{library}}.bam", library=LIBRARIES),
+        bai=expand(f"{config['readgroup_dir']}/{{library}}.bam.bai", library=LIBRARIES)
+    output:
+        f"{config['check_IBS']}/replicate_key.txt"
+    params:
+        bamdir=config['readgroup_dir']
+    conda: "../../envs/GBS.yml"
+    shell:
+        """
+        ls {params.bamdir}/*.bam | xargs -n 1 basename | sed 's/\\.bam$//' | nl -w1 -s$'\t' > {output}
+    """
+
+
+rule test_replicates:
+    resources:
+        mem_mb = 30 * 1024,
+        time = 72 * 60,
+        partition = "bmh"
+    input: f"{config['check_IBS']}/bam_list.txt"
+    output: f"{config['check_IBS']}/CheckIBS.tped"
+    params:
+        outfile=f"{config['check_IBS']}/CheckIBS",
+        ref=config['reference_file'],
+        chr=config['IBS_bed']
+    conda: "../../envs/GBS.yml"
+    shell:"""
+        #Run angsd using the created text file for the -bam parameter
+        angsd -out {params.outfile} -bam {input} -ref {params.ref} -nThreads 2 \
+        -doPlink 2 \
+        -doGeno -4 \
+        -doPost 1 \
+        -doMajorMinor 1 \
+        -GL 1 \
+        -doCounts 1 \
+        -doMaf 2 \
+        -postCutoff 0.99  \
+        -SNP_pval 1e-6 \
+        -geno_minDepth 4 \
+        -trim 0 -C 50 -baq 1 \
+        -minMapQ 30 -minQ 30 -minInd 8 \
+        -uniqueOnly 1 -remove_bads 1 \
+        -rf {params.chr}
+        """ 
+
+rule check_IBS:
+    resources:
+        mem_mb = 5 * 1024,
+        time = 24 * 60,
+        partition = "bmh"
+    input: f"{config['check_IBS']}/CheckIBS.tped"
+    output: f"{config['check_IBS']}/CheckIBS.genome"
+    params:
+        outfile=f"{config['check_IBS']}/CheckIBS"
+    conda:  "../../envs/GBS.yml"
+    shell:"""
+        #Convert the tped file to a bed file
+        plink --tfile {params.outfile} --allow-extra-chr --make-bed --out {params.outfile}
+
+        #Run IBS check
+        plink --bfile {params.outfile} --genome --allow-extra-chr --biallelic-only --recode --out {params.outfile}
+        """
+
+rule compare_replicates:
+    resources:
+        mem_mb = 5 * 1024,
+        time = 1 * 60,
+        partition = "bmh"
+    input: 
+        ibs_file = f"{config['check_IBS']}/CheckIBS.genome",
+        replicate_key = f"{config['check_IBS']}/replicate_key.txt",
+        depth_file = f"{config['library_qcmetrics_dir']}/library_depth_summary.txt"
+    output: 
+        pi_hat_replicates = f"{config['check_IBS']}/max_pi_hat_comparisons.csv"
+    conda:  "../../envs/GBS.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/compare_replicates.R"
+
+rule merge_bams_per_sample:
+    resources:
+        mem_mb = lambda wildcards, attempt: 5 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input: 
+        lambda wildcards: [f"{config['readgroup_dir']}/{lib}.bam" for lib, sample in library_to_sample.items() if sample == wildcards.sample]
+    output: f"{config['merge_dir']}/{{sample}}.merged.bam"
+    conda:  "../../envs/GBS.yml"
+    shell:"""
+        samtools merge {output} {input}
+    """
+
+rule index_bams:
+    resources:
+        mem_mb = lambda wildcards, attempt: 5 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input: f"{config['merge_dir']}/{{sample}}.merged.bam"
+    output: f"{config['merge_dir']}/{{sample}}.merged.bam.bai"
+    conda:  "../../envs/GBS.yml"
+    shell:"""
+        samtools index {input}
+    """
+
+rule alignment_metrics:
+    resources:
+        mem_mb = lambda wildcards, attempt: 5 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input:
+        bam=f"{config['merge_dir']}/{{sample}}.merged.bam",
+        bai=f"{config['merge_dir']}/{{sample}}.merged.bam.bai"
+    output: 
+        metrics=f"{config['qcmetrics_dir']}/{{sample}}_summaryMetrics.txt"
+    params:
+        reference=config['reference_file']
+    conda:  "../../envs/GBS.yml"
+    shell:"""
+        picard CollectAlignmentSummaryMetrics \
+        R={params.reference} \
+        I={input.bam} \
+        O={output.metrics} \
+        VALIDATION_STRINGENCY=LENIENT
+    """
+
+rule get_genomic_depths:
+    resources:
+        mem_mb = lambda wildcards, attempt: 10 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input: 
+        bam=f"{config['merge_dir']}/{{sample}}.merged.bam",
+        bai=f"{config['merge_dir']}/{{sample}}.merged.bam.bai"
+    output: f"{config['qcmetrics_dir']}/{{sample}}.genomic.depth.summary.txt"
+    conda:  "../../envs/GBS.yml"
+    shell:"""   
+    samtools depth {input.bam} | awk '{{sum+=$3; count++}} END {{if (count > 0) print sum/count; else print \"NA\"}}' > {output}
+    """
+
+rule get_Xchr_depths:
+    resources:
+        mem_mb = lambda wildcards, attempt: 10 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input: 
+        bam=f"{config['merge_dir']}/{{sample}}.merged.bam",
+        bai=f"{config['merge_dir']}/{{sample}}.merged.bam.bai"
+    output: f"{config['qcmetrics_dir']}/{{sample}}.Xchr.depth.summary.txt"
+    conda:  "../../envs/GBS.yml"
+    shell:"""   
+    samtools depth -r {config[x_chromosome]} {input.bam} | awk '{{sum+=$3; count++}} END {{if (count > 0) print sum/count; else print \"NA\"}}' > {output}
+    """
+
+rule summarize_depths:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 20 * attempt,
+        partition = "bmh"
+    input: 
+        genomic=expand(f"{config['qcmetrics_dir']}/{{sample}}.genomic.depth.summary.txt", sample=SAMPLES),
+        Xchr=expand(f"{config['qcmetrics_dir']}/{{sample}}.Xchr.depth.summary.txt", sample=SAMPLES)
+    output: f"{config['qcmetrics_dir']}/depthsummary_unique.txt"
+    conda: "../../envs/GBS.yml"
+    shell: """
+        echo -e "BamFile\tGenomeWideAvgDepth\tXChrAvgDepth" > {output}
+
+        # Loop over the genomic depth files and Xchr depth files together
+        for genomic_file in {input.genomic}; do
+            # Extract the sample name from the genomic file
+            sample_name=$(basename $genomic_file .genomic.depth.summary.txt)
+            
+            # Get the corresponding Xchr file
+            xchr_file={config[qcmetrics_dir]}/$sample_name.Xchr.depth.summary.txt
+            
+            # Check if both the genomic and Xchr files exist
+            if [[ ! -f $genomic_file ]]; then
+                echo "Error: Genomic file $genomic_file does not exist!" 1>&2
+                exit 1
+            fi
+            if [[ ! -f $xchr_file ]]; then
+                echo "Error: Xchr file $xchr_file does not exist!" 1>&2
+                exit 1
+            fi
+
+            # Extract depths from the files
+            genomic_depth=$(cat $genomic_file | head -n 1)
+            xchr_depth=$(cat $xchr_file | head -n 1)
+
+            # Handle missing or NA values
+            if [[ "$genomic_depth" == "NA" ]] || [[ -z "$genomic_depth" ]]; then
+                genomic_depth=0
+                echo "Warning: NA or missing genomic depth for $sample_name, setting to 0" 1>&2
+            fi
+            if [[ "$xchr_depth" == "NA" ]] || [[ -z "$xchr_depth" ]]; then
+                xchr_depth=0
+                echo "Warning: NA or missing Xchr depth for $sample_name, setting to 0" 1>&2
+            fi
+            
+            # Write the sample name and depths to the output file
+            echo -e "$sample_name\t$genomic_depth\t$xchr_depth" >> {output}
+        done
+    """

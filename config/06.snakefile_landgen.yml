@@ -1,0 +1,9 @@
+######### UPDATE ACCORDING TO YOUR PROJECT #########
+# Name of firectory to putput Landscape Genetics files
+landgen_dir: LandGen
+
+# Exclude populations
+exclude_pops: 
+  [] # < if you don't want to exclude any populations
+  #- Smt  # Example population to exclude
+  #- Bak # Just add more to the list if you want to exclude more populations

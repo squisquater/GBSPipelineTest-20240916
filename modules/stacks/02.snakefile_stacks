@@ -1,0 +1,299 @@
+configfile: "config/02.snakefile_stacks.yml"
+
+##Update file paths in the config dictionary 
+config['stacks_dir'] = f"{config['output_dir']}/stacks" ## Directory to write stacks output files
+config['refmap_dir'] = f"{config['stacks_dir']}/refmap_output" ## Directory to write output files from the stacks ref_map pipeline
+config['populations_dir'] = f"{config['stacks_dir']}/{config['populations_run']}" ## Directory to write output files from the stacks populations pipeline
+
+
+rule all_stacks:
+    input: f"{config['output_dir']}/depthfiltered_{config['depth_threshold']}x.txt",
+        f"{config['output_dir']}/popmap_{config['depth_threshold']}x.txt",
+        f"{config['populations_dir']}/populations.plink.imiss",
+        f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.bed", 
+        f"{config['populations_dir']}/ABcorrected_filtered_populations.snps.vcf", 
+        f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.vcf.gz",
+        f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.plink.fam",
+        f"{config['populations_dir']}/adjusted_pcs.txt",
+        f"{config['populations_dir']}/ABcorrected_Filtered_PCA.png",
+        f"{config['populations_dir']}/ABcorrected_Filtered_MDS.png"
+
+rule filter_by_depth:
+    resources:
+        mem_mb = lambda wildcards, attempt: 2 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmm"
+    input:
+        depth_summary = f"{config['qcmetrics_dir']}/depthsummary_unique.txt"  # Path to depth summary file
+    output:
+        valid_samples = f"{config['output_dir']}/depthfiltered_{config['depth_threshold']}x.txt"  # Include threshold in filename
+    params:
+        threshold = config['depth_threshold']  # Depth threshold from config
+    conda: "../../envs/GBS.yml"
+    shell:
+        """
+        # Skip the header and extract sample IDs with mean depth > threshold, write to the output file
+        awk -v threshold={params.threshold} 'NR > 1 && $2 > threshold {{print $1}}' {input.depth_summary} > {output.valid_samples}
+        """
+
+rule generate_popmap_with_regions:
+    resources:
+        mem_mb = lambda wildcards, attempt: 2 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmm"
+    input:
+        depth_filtered=f"{config['output_dir']}/depthfiltered_{config['depth_threshold']}x.txt",
+        database = f"{'input_files'}/{config['masterDB']}"
+    output:
+        popmap=f"{config['output_dir']}/popmap_{config['depth_threshold']}x.txt"
+    conda: "../../envs/GBS.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/generate_popmap.py"
+
+rule stacks_refmap:
+    resources:
+        mem_mb = lambda wildcards, attempt: 50 * 1024 * attempt,
+        time = lambda wildcards, attempt:  5 * 60 * attempt,
+        partition = "bmh"
+    input: 
+        popmap = f"{config['output_dir']}/popmap_{config['depth_threshold']}x.txt"
+    output: 
+        reflog = (f"{config['refmap_dir']}/ref_map.log"),
+        catalog = (f"{config['refmap_dir']}/catalog.fa.gz")
+    params:
+        refmap_dir=config['refmap_dir'],
+         bamdir = config['merge_dir']
+    conda: "../../envs/GBS.yml"
+    shell:"""
+        ref_map.pl -T 1 --samples {params.bamdir} --popmap {input.popmap} -o {params.refmap_dir}
+    """  
+
+rule stacks_populations:
+    resources:
+        mem_mb = lambda wildcards, attempt: 20 * 1024 * attempt,
+        time = lambda wildcards, attempt: 5 * 60 * attempt,
+        partition = "bmh"
+    input: 
+        reflog = (f"{config['refmap_dir']}/ref_map.log"),
+        catalog = (f"{config['refmap_dir']}/catalog.fa.gz"),
+        popmap = f"{config['output_dir']}/popmap_{config['depth_threshold']}x.txt"
+    output: 
+        ped = f"{config['populations_dir']}/populations.plink.ped",
+        map = f"{config['populations_dir']}/populations.plink.map",
+        vcf = f"{config['populations_dir']}/populations.snps.vcf.gz"
+    params:
+        refmap_dir=config['refmap_dir'],
+        pop_dir=config['populations_dir'],
+        min_maf=config['populations']['min_maf'],
+        max_obs_het=config['populations']['max_obs_het'],
+        min_samples_overall=config['populations']['min_samples_overall']
+    conda: "../../envs/GBS.yml"
+    shell:"""
+        populations -P {params.refmap_dir} -O {params.pop_dir} -M {input.popmap} --min-maf {params.min_maf} --max-obs-het {params.max_obs_het} --min-samples-overall {params.min_samples_overall} --write-single-snp --ordered-export --structure --vcf --plink --radpainter --genepop --phylip-var --treemix
+        gzip {params.pop_dir}/populations.snps.vcf  # Gzip the VCF file
+    """
+
+rule check_missingness:
+    resources:
+        mem_mb = lambda wildcards, attempt: 3 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input: 
+        ped = f"{config['populations_dir']}/populations.plink.ped",
+        map = f"{config['populations_dir']}/populations.plink.map"
+    output: 
+        imiss = f"{config['populations_dir']}/populations.plink.imiss",
+        lmiss = f"{config['populations_dir']}/populations.plink.lmiss"
+    params:
+        plinkfile = f"{config['populations_dir']}/populations.plink",
+        out_prefix = f"{config['populations_dir']}/populations.plink"
+    conda: "../../envs/GBS.yml"
+    shell: 
+        """
+        plink --file {params.plinkfile} --dog --allow-extra-chr --missing --out {params.out_prefix}
+        """
+
+rule correct_allelic_imbalance:
+    resources:
+        mem_mb = lambda wildcards, attempt: 3 * 1024 * attempt,
+        time = lambda wildcards, attempt: 2 * 60 * attempt,  # Adjust time as needed
+        partition = "bmm"
+    input:
+       vcf = f"{config['populations_dir']}/populations.snps.vcf.gz"
+    output:
+        vcf = f"{config['populations_dir']}/ABcorrected_populations.snps.vcf",
+        log = f"{config['populations_dir']}/ABcorrected_output.log"
+    params:
+        pvalue = config['allelicBalance']['p_value'],  # Adjust the p-value threshold as needed
+        ratio = config['allelicBalance']['ratio'],  # Adjust the allelic ratio cutoff as needed
+        script_dir = config['accessory_scripts_dir']
+    conda: "../../envs/GBS.yml"
+    shell:
+        """
+        python "{params.script_dir}/allelic_balance.py" --input {input.vcf} --output {output.vcf} --log {output.log} --exclude --pvalue {params.pvalue} --ratio {params.ratio}
+        """
+
+rule filter_individuals_with_bcftools:
+    resources:
+        mem_mb = lambda wildcards, attempt: 3 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input:
+        vcf = f"{config['populations_dir']}/ABcorrected_populations.snps.vcf"
+    output:
+        bed = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.bed",
+        bim = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.bim",
+        fam = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.fam",
+        vcf = f"{config['populations_dir']}/ABcorrected_filtered_populations.snps.vcf",
+    params:
+        missingness = config['bcftools']['missingness'],  # Adjust based on your config
+        mind_threshold = config['bcftools']['mind_threshold'],  # Adjust based on your config
+        plink_prefix = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink",
+        pop_map = f"{config['output_dir']}/popmap_{config['depth_threshold']}x.txt",
+        script_dir = config['accessory_scripts_dir']
+    conda: "../../envs/bcftools.yml"
+    shell:
+        """
+        # Extract sample IDs from the VCF file
+        bcftools query -l {input.vcf} > sample_ids.txt
+        
+        # Run the Python script to append population info to the VCF file
+        python "{params.script_dir}/append_population.py" --input {input.vcf} --output {input.vcf}.tmp --popmap {params.pop_map}
+        
+        # Filter the VCF file based on SNP missingness
+        bcftools filter -i 'F_MISSING<{params.missingness}' {input.vcf}.tmp -o {output.vcf}.tmp
+        
+        # Calculate the number of missing genotypes per individual
+        bcftools query -f '[%SAMPLE\t%GT\n]' {output.vcf}.tmp | \
+        awk -v OFS="\t" '{{ if($2 == "./.") counts[$1]++ }} END {{ for (i in counts) print i, counts[i] }}' > ind_missing.txt
+        
+        # Calculate the total number of SNPs
+        total_snps=$(bcftools view -H {output.vcf}.tmp | wc -l)
+        
+        # Identify individuals with >20% missing data
+        awk -v total_snps=$total_snps -v threshold={params.mind_threshold} '{{ 
+            if ($2 / total_snps > threshold) 
+                print $1 
+        }}' ind_missing.txt > remove_samples.txt
+        
+        # Remove individuals with >20% missing data from the VCF
+        bcftools view -S ^remove_samples.txt {output.vcf}.tmp -o {output.vcf} --force-samples
+        
+        # Fill in tags and update the VCF file
+        bcftools +fill-tags {output.vcf} -- -t HWE > {output.vcf}.tmp2 && mv {output.vcf}.tmp2 {output.vcf}
+        
+        # Convert the VCF to PLINK format
+        plink --vcf {output.vcf} --dog --allow-extra-chr --make-bed --recode --out {params.plink_prefix}
+        
+        # Cleanup temporary files
+        rm sample_ids.txt ind_missing.txt remove_samples.txt {input.vcf}.tmp {output.vcf}.tmp
+        """
+
+rule adjust_pcs:
+    resources:
+        mem_mb = lambda wildcards, attempt: 3 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input:
+        fam = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.fam"
+    output:
+        pcs = f"{config['populations_dir']}/adjusted_pcs.txt"
+    conda: "../../envs/GBS.yml"
+    shell: """
+        # Calculate the number of individuals in the .fam file
+        num_individuals=$(wc -l < {input.fam})
+        
+        # Calculate the number of PCs (num_individuals - 1)
+        num_pcs=$((num_individuals - 1))
+        
+        # Write the number of PCs to the output file
+        echo "$num_pcs" > {output.pcs}
+    """
+
+rule plink_pca:
+    resources:
+        mem_mb = lambda wildcards, attempt: 3 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input: 
+        bed = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.bed",
+        bim = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.bim",
+        fam = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.fam",
+        pcs = f"{config['populations_dir']}/adjusted_pcs.txt"
+    output: 
+        eigenval = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.eigenval",
+        eigenvec = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.eigenvec",
+        mds = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.mds"
+    params:
+        plinkfile = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink",
+        out_prefix = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink"
+    conda: "../../envs/GBS.yml"
+    shell: 
+        """
+        plink --bfile {params.plinkfile} --dog --allow-extra-chr --pca $(cat {input.pcs}) --freq --make-rel --mds-plot 2 --cluster --missing --out {params.out_prefix}
+        """
+
+rule pca_visualization_filtered:
+    resources:
+        mem_mb = lambda wildcards, attempt: 3 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input:
+        eigenval = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.eigenval",
+        eigenvec = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.eigenvec"
+    output:
+        pca_plot = f"{config['populations_dir']}/ABcorrected_Filtered_PCA.png",
+    conda: "../../envs/GBS.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/pca_plot.R"
+
+rule mds_visualization_filtered:
+    resources:
+        mem_mb = lambda wildcards, attempt: 3 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 60 * attempt,
+        partition = "bmh"
+    input:
+        mds = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.mds"
+    output:
+        mds_plot = f"{config['populations_dir']}/ABcorrected_Filtered_MDS.png"
+    conda: "../../envs/GBS.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/mds_plot.R"
+
+rule filter_populations_with_bcftools:
+    resources:
+        mem_mb = lambda wildcards, attempt: 4 * 1024 * attempt,
+        time = lambda wildcards, attempt: 2 * 60 * attempt,
+        partition = "bmh"
+    input:
+        vcf = f"{config['populations_dir']}/ABcorrected_filtered_populations.snps.vcf",
+        fam = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.fam"
+    output:
+        vcf = f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.vcf.gz",
+        bed = f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.plink.bed",
+        bim = f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.plink.bim",
+        fam = f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.plink.fam"
+    params:
+        min_samples_per_pop = config['bcftools']['min_samples_per_pop'], # Adjust based on your config
+        out_prefix = f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.plink"
+    conda: "../../envs/bcftools.yml"
+    shell:
+        """
+        # Extract the population info from the .fam file (first two columns are FID and IID)
+        awk '{{print $1}}' {input.fam} | sort | uniq -c | awk '$1 >= {params.min_samples_per_pop} {{print $2}}' > valid_pops.txt
+        
+        # Extract sample IDs of individuals from valid populations and merge Pop ID with Sample ID
+        grep -f valid_pops.txt {input.fam} | awk '{{print $1"_"$2}}' > valid_samples.txt
+        
+        # Filter the VCF to only include individuals from populations with >5 members
+        bcftools view -S valid_samples.txt --force-samples {input.vcf} -Oz -o {output.vcf}
+        
+        # Index the filtered VCF
+        bcftools index {output.vcf}
+        
+        # Convert the filtered VCF to PLINK format and remove any residual monomorphic SNPs
+        plink --vcf {output.vcf} --dog --allow-extra-chr --maf 0.01 --make-bed --out {params.out_prefix}
+        
+        # Cleanup
+        rm valid_pops.txt valid_samples.txt
+        """

@@ -1,0 +1,121 @@
+configfile: "config/06.snakefile_landgen.yml"
+
+##Add land gen file path to the config dictionary
+config['landgen_dir'] = f"{config['populations_dir']}/{config['landgen_dir']}" 
+
+rule all_LandGen:
+    input: f"{config['landgen_dir']}/pairwise_fst_matrix.csv",
+        f"{config['landgen_dir']}/neis_d_matrix.csv",
+        f"{config['landgen_dir']}/pairwise_fst_heatmap.png",
+        f"{config['landgen_dir']}/pairwise_neis_d_heatmap.png",
+        #f"{config['landgen_dir']}/sample_coords.csv",
+        f"{config['landgen_dir']}/individual_centroids.csv",
+        f"{config['landgen_dir']}/merge_popind_centroids.csv",
+        f"{config['landgen_dir']}/population_centroids.csv",
+        f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model.png",
+        f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model_Exclude.png"
+
+
+rule generate_distance_matrices:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
+        time = lambda wildcards, attempt:  5 * 60 * attempt,
+        partition = "bmh"
+    input: 
+        vcf = f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.vcf.gz",
+        fam = f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.plink.fam"
+    output: 
+        f"{config['landgen_dir']}/pairwise_fst_matrix.csv",
+        f"{config['landgen_dir']}/neis_d_matrix.csv",
+        f"{config['landgen_dir']}/pairwise_fst_heatmap.png",
+        f"{config['landgen_dir']}/pairwise_neis_d_heatmap.png"
+    params:
+        landgen_dir=config['landgen_dir']
+    conda: "../../envs/LandGen.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/GenDist.R"
+
+rule extract_coords:
+    resources:
+        mem_mb = lambda wildcards, attempt: 10 * 1024 * attempt,
+        time = lambda wildcards, attempt:  5 * 60 * attempt,
+        partition = "bmh"
+    input:
+        fam=f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.plink.fam", 
+        database = f"{input_files}/{config['masterDB']}"
+    output:
+        ind_coords=f"{config['landgen_dir']}/sample_coords.csv"
+    params:
+        landgen_dir=config['landgen_dir']
+    conda: "../../envs/LandGen.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/extract_sample_coords.py"
+
+rule find_indCentroids:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
+        time = lambda wildcards, attempt:  5 * 60 * attempt,
+        partition = "bmh"
+    input:
+        ind_coords=f"{config['landgen_dir']}/sample_coords.csv"
+    output:
+        ind_centroids=f"{config['landgen_dir']}/individual_centroids.csv"
+    params:
+        landgen_dir=config['landgen_dir']
+    conda: "../../envs/LandGen.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/calculate_ind_centroids.R"
+
+rule merge_centroids_with_fam:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
+        time = lambda wildcards, attempt:  5 * 60 * attempt,
+        partition = "bmh"
+    input:
+        ind_centroids=f"{config['landgen_dir']}/individual_centroids.csv",
+        fam=f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.plink.fam",
+    output:
+        merged_file=f"{config['landgen_dir']}/merge_popind_centroids.csv"
+    params:
+        landgen_dir=config['landgen_dir'],
+    conda: "../../envs/LandGen.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/merge_centroids_with_fam.py"
+
+rule find_popCentroids:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
+        time = lambda wildcards, attempt:  5 * 60 * attempt,
+        partition = "bmh"
+    input:
+        merged_file=f"{config['landgen_dir']}/merge_popind_centroids.csv"
+    output:
+        pop_centroids=f"{config['landgen_dir']}/population_centroids.csv"
+    params:
+        landgen_dir=config['landgen_dir']
+    conda: "../../envs/LandGen.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/calculate_pop_centroids.R"
+
+rule pop_IBD_analysis:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
+        time = lambda wildcards, attempt: 5 * 60 * attempt,
+        partition = "bmh"
+    input:
+        vcf=f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.vcf.gz",
+        fam=f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.plink.fam",
+        pop_centroids=f"{config['landgen_dir']}/population_centroids.csv"
+    output:
+        ibd_plot=f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model.png",
+        ibd_plot_exclude=f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model_Exclude.png",
+        mantel_result=f"{config['landgen_dir']}/mantel_test_result.txt",
+        mantel_result_exclude=f"{config['landgen_dir']}/mantel_test_result_excludePop.txt",
+        geo_dist_matrix=f"{config['landgen_dir']}/geo_distance_matrix.csv",
+        gen_dist_matrix=f"{config['landgen_dir']}/genetic_distance_matrix.csv"
+    params:
+        landgen_dir=config['landgen_dir'],
+        exclude_pops=config.get('exclude_pops', [])  # List of populations to exclude (empty if none)
+    conda: "../../envs/LandGen.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/isolation_by_distance.R"

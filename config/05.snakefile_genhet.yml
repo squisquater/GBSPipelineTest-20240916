@@ -1,0 +1,14 @@
+# Estimate Frequencies from Data (T/F)? 
+## if you want GENHET to estimate and use the allele frequencies of dat, use estimfreq=”T”
+## if you want to use allele frequencies based on a different dataset, use estimfreq=”F” (and provide a file of allele frequencies via the argument alfuser, see below)
+estimfreq: "T"
+
+## if estimfreq=”F”, this is the object containing the allele frequencies
+## if estimfreq=”T” this argument does not have to be specified. See manual for how to format this file.
+alfuser: []
+
+# Plot y-axis limits for heterozygosity plots
+plot_y_limits:
+  He:
+    ymin: 0
+    ymax: 0.5

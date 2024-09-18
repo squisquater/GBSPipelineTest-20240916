@@ -1,0 +1,29 @@
+######### UPDATE ACCORDING TO YOUR PROJECT #########
+
+# Project Directory
+home_dir: "/group/ctbrowngrp4/2024-sophiepq-GBSpipeline/RedRuppells" ## Directory containing all the input files, config files, module files, etc. for the project
+
+# Data Directory
+data_dir: "/group/ctbrowngrp2/sophiepq/RedRuppellsGBS/fastq_files" ## Directory containing all fastq files
+
+# Sample/Metadata File - Just the name assuming it's in the "input_files" directory
+masterDB: "MasterDB_test.txt"
+## Path to a databse that contains at least 3 columns ('Individual.ID', 'Library.ID', 'and 'Region.ID').
+##There may be multiple libraries per sample, but each library must be on a separate line. This will be used to merge the bam files for each sample.
+## If you want to run this through the Land Gen Analyses you will also need a 'Lat' and 'Long' column.
+
+# Reference file
+reference_file: "/group/ctbrowngrp2/cbquinn/fox4/ref/GCF_018345385.1/GCF_018345385.1_ASM1834538v1_genomic.fna" ## Location of your Reference Genome
+reference_nickname: "Vulp.lag" ## Nickname for your reference genome 
+x_chromosome: "NC_054848.1" ## Name of your X chromosome (haven't tested the pipline if you don't have this information) Maybe choose a random scaffold and just ignore that info in the summary file. 
+
+#This file is used to select a region or regions to analyze to assess Identity by State (IBS) between individuals for helping to corectly ID replicates.
+#If you don't have this information, you need to go into the snakefile under rule test_replicates and comment out the line that calls the bedfile --> "-rf {params.chr}"
+IBS_bed: "/group/ctbrowngrp2/cbquinn/fox4/ref/GCF_018345385.1/autosomes.bed" ## Location of your bedfile (you can make this if you don't have one.)
+
+# Other settings
+
+# Samtools parameters (modify if you want to change the minimum mapping quality)
+samtools:
+  flag: 4 ## Flag for samtools view that removes unmapped reads
+  mapq: 20 ## Minimum mapping quality for samtools view

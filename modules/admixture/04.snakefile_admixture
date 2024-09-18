@@ -1,0 +1,143 @@
+import pandas as pd
+
+configfile: "config/04.snakefile_admixture.yml"
+
+##Update file paths in the config dictionary
+config['admixture_dir'] = f"{config['populations_dir']}/admixture" ## Directory to put admixture results
+
+# Generate K values from config
+K_values = list(range(config['K_start'], config['K_end'] + 1))
+
+
+rule all_admixture:
+    input:
+        expand(f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr_K{{K}}.Q", K=K_values),
+        expand(f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.Q", K=K_values),
+        f"{config['admixture_dir']}/admixture_metrics_CVEsummary.txt",
+        f"{config['admixture_dir']}/merged_q_values_summary.txt",
+        f"{config['admixture_dir']}/admixture_barplots.png"
+
+
+rule rename_chromosomes:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 30 * attempt,
+        partition = "bmh"
+    input:
+        bed_file = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.bed",
+        bim_file = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.bim",
+        fam_file = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.fam"
+    output:
+        bed_file_renamed = f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr.bed",
+        bim_file_renamed = f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr.bim",
+        fam_file_renamed = f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr.fam",
+        renaming_key = f"{config['admixture_dir']}/Chr_renaming_key.txt",
+    params:
+        script_dir = config['accessory_scripts_dir']
+    conda: "../../envs/GBS.yml"
+    shell:
+        """
+        cp {input.bed_file} {output.bed_file_renamed}
+        cp {input.fam_file} {output.fam_file_renamed}
+        python "{params.script_dir}/rename_chromosomes.py" {input.bim_file} {output.bim_file_renamed} {output.renaming_key}
+        """
+
+rule run_admixture:
+    resources:
+        mem_mb = lambda wildcards, attempt: 10 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 2 * 60 * attempt,
+        partition = "bmh"
+    input:
+        bed = f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr.bed"
+    output:
+        out_file = f"{config['home_dir']}/ABcorrected_filtered_populations.plink_renamedChr_K{{K}}.Q",
+        out_file_Q = f"{config['home_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.Q",
+        out_file_P = f"{config['home_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.P",
+        out_file_Qbias = f"{config['home_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.Q_bias",
+        out_file_Qse = f"{config['home_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.Q_se"
+    params:
+        K = "{K}",
+        output_dir = config['admixture_dir'],
+        bootstrap = config['admixture']['bootstrap'],
+        CV = config['admixture']['CV']
+    conda: "../../envs/GBS.yml"
+    shell:
+        """
+        admixture -B{params.bootstrap} --cv={params.CV} {input.bed} {params.K} | tee {output.out_file}
+        """
+
+rule clean_up_admixture:
+    resources:
+        mem_mb = lambda wildcards, attempt: 10 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1 * 2 * 60 * attempt,
+        partition = "bmh"
+    input:
+        expand(f"{config['home_dir']}/ABcorrected_filtered_populations.plink_renamedChr_K{{K}}.Q", K=K_values),
+        expand(f"{config['home_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.Q", K=K_values),
+        expand(f"{config['home_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.P", K=K_values),
+        expand(f"{config['home_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.Q_bias", K=K_values),
+        expand(f"{config['home_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.Q_se", K=K_values)
+    output:
+        expand(f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr_K{{K}}.Q", K=K_values),
+        expand(f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.Q", K=K_values),
+        expand(f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.P", K=K_values),
+        expand(f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.Q_bias", K=K_values),
+        expand(f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.Q_se", K=K_values)
+    params:
+        output_dir = config['admixture_dir']
+    conda: "../../envs/GBS.yml"
+    shell:
+        """
+        mv {input} {params.output_dir}
+        """
+
+rule summarize_admixture_CVE:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1024 * attempt,
+        time = lambda wildcards, attempt: 6 * 60 * attempt,
+        partition = "bmh"
+    input:
+        expand(f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr_K{{K}}.Q", K=K_values)
+    output:
+        summary_file = f"{config['admixture_dir']}/admixture_metrics_CVEsummary.txt"
+    params:
+        input_dir = config['admixture_dir'],
+        input_prefix = "ABcorrected_filtered_populations.plink",
+        K_start = config['K_start'],
+        K_end = config['K_end']
+    conda: "../../envs/GBS.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/admixture_metrics.R"
+
+rule summarize_q_values:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1024 * attempt,
+        time = lambda wildcards, attempt: 6 * 60 * attempt,
+        partition = "bmh"
+    input:
+        q_files = expand(f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.Q", K=K_values),
+        fam_file = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.fam"
+    output:
+        summary_file = f"{config['admixture_dir']}/merged_q_values_summary.txt"
+    params:
+        admixture_dir = config['admixture_dir'],
+        fam_file = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.fam"
+    conda: "../../envs/GBS.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/summarize_admixture_qvalues.R"
+
+
+rule plot_admixture_barplots:
+    resources:
+        mem_mb = lambda wildcards, attempt: 1024 * attempt,
+        time = lambda wildcards, attempt: 6 * 60 * attempt,
+        partition = "bmh"
+    input:
+        summary_file = f"{config['admixture_dir']}/merged_q_values_summary.txt"
+    output:
+        output_file = f"{config['admixture_dir']}/admixture_barplots.png"
+    params:
+        admixture_dir = config['admixture_dir']
+    conda: "../../envs/cowplot.yml"
+    script:
+        f"{config['accessory_scripts_dir']}/plot_admixture_barplots.R"

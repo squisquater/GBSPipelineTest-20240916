@@ -1,0 +1,20 @@
+# Ignore everything
+*
+
+# Do not ignore directories
+!*/
+
+# explicitly ignore the .snakemake subdirectory
+.snakemake/
+
+# Unignore all files inside specific directories
+!accessory_scripts/**
+!config/**
+!envs/**
+!input_files/**
+!modules/**
+
+# Unignore specific files in the root directory
+!00.snakefile_master
+!.gitignore
+!README.md
