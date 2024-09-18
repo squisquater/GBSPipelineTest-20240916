@@ -1,5 +1,5 @@
 K_start: 1
-K_end: 5
+K_end: 12
 
 admixture:
   bootstrap: 2000

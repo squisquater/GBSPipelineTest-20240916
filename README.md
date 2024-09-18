@@ -12,7 +12,7 @@ This Snakemake workflow automates the process of aligning genomic reads, identif
 - **SNP Calling**: Use the Stacks `ref_map` and `populations` pipelines to call SNPs.
 - **Population Genetics**: Perform PCA, MDS, and ADMIXTURE analyses to estimate population structure.
 - **Landscape Genetics**: Generate pairwise FST and Nei's D matrices, calculate centroids, and test isolation-by-distance using Mantel tests.
-- **Modular Workflow**: Individual snakefiles allow for running different sections independently, but the entire pipeline can also be run from the master snakefile.
+- **Modular Workflow**: Individual snakefiles allow for running different sections independently, but the entire pipeline can also be run from the main snakefile.
 
 ## Directory Structure
 
@@ -137,10 +137,10 @@ After customizing the input files and configuration files, you can run the entir
 
 ```
 ## Dry Run
-snakemake -s 00.snakefile_master --profile slurm -n -r 
+snakemake -s 00.snakefile_main --profile slurm -n -r 
 
 ## Actual Run
-snakemake -s 00.snakefile_master --profile slurm --jobs 30
+snakemake -s 00.snakefile_main --profile slurm --jobs 30
 ```
 
 **Run individual modules:**

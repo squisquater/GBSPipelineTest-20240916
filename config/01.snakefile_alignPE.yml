@@ -1,10 +1,10 @@
 ######### UPDATE ACCORDING TO YOUR PROJECT #########
 
 # Project Directory
-home_dir: "/group/ctbrowngrp4/2024-sophiepq-GBSpipeline/RedRuppells" ## Directory containing all the input files, config files, module files, etc. for the project
+home_dir: "/group/ctbrowngrp4/2024-sophiepq-kitfoxGBS/GBSPipelineTest-20240916" ## Directory containing all the input files, config files, module files, etc. for the project
 
 # Data Directory
-data_dir: "/group/ctbrowngrp2/sophiepq/RedRuppellsGBS/fastq_files" ## Directory containing all fastq files
+data_dir: "/group/ctbrowngrp2/sophiepq/KitFoxGBS/fastq_files.PE" ## Directory containing all fastq files
 
 # Sample/Metadata File - Just the name assuming it's in the "input_files" directory
 masterDB: "MasterDB_test.txt"

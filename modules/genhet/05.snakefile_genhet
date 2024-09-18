@@ -8,8 +8,12 @@ rule all_GenHet:
     input:
         f"{config['genhet_dir']}/genhet_input.txt",
         f"{config['genhet_dir']}/genhet_output.txt",
-        #f"{config['genhet_dir']}/heterozygosity_vs_depth.png",
-        #f"{config['genhet_dir']}/heterozygosity_barplot.png"
+        f"{config['genhet_dir']}/genhet_vs_depth.txt",
+        f"{config['genhet_dir']}/genhet_vs_depth.png",
+        f"{config['genhet_dir']}/genhet_vs_depth_corr.txt",
+        f"{config['genhet_dir']}/genhet_barplots.png",
+        f"{config['genhet_dir']}/genhet_summary.txt"
+
 
 rule plink_to_genhet:
     resources:

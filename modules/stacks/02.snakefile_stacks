@@ -145,6 +145,8 @@ rule filter_individuals_with_bcftools:
         bim = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.bim",
         fam = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.fam",
         vcf = f"{config['populations_dir']}/ABcorrected_filtered_populations.snps.vcf",
+        ped = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.ped",
+        map = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.map"
     params:
         missingness = config['bcftools']['missingness'],  # Adjust based on your config
         mind_threshold = config['bcftools']['mind_threshold'],  # Adjust based on your config

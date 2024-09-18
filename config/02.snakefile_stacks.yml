@@ -1,7 +1,7 @@
 depth_threshold: 15  # Set the threshold for mean depth filtering
 
 # Populations Run
-populations_run: "RedRuppells_15x_singleSNP.ordered.AB0.2"
+populations_run: "SJKF_15x_singleSNP.ordered.AB0.2"
 
 # Populations parameters
 populations:
