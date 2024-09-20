@@ -14,7 +14,7 @@ This Snakemake workflow automates the process of aligning genomic reads, identif
 - **Landscape Genetics**: Generate pairwise FST and Nei's D matrices, calculate centroids, and test isolation-by-distance using Mantel tests.
 - **Modular Workflow**: Individual snakefiles allow for running different sections independently, but the entire pipeline can also be run from the main snakefile.
 
-## Wokflow Visual
+## Workflow Visual
 <img align="center" src="/SnakemakePipelineGraphic.png" width="1000">
 
 ## Directory Structure
