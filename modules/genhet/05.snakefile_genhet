@@ -9,9 +9,9 @@ rule all_GenHet:
         f"{config['genhet_dir']}/genhet_input.txt",
         f"{config['genhet_dir']}/genhet_output.txt",
         f"{config['genhet_dir']}/genhet_vs_depth.txt",
-        f"{config['genhet_dir']}/genhet_vs_depth.png",
+        f"{config['genhet_dir']}/genhet_vs_depth.pdf",
         f"{config['genhet_dir']}/genhet_vs_depth_corr.txt",
-        f"{config['genhet_dir']}/genhet_barplots.png",
+        f"{config['genhet_dir']}/genhet_barplots.pdf",
         f"{config['genhet_dir']}/genhet_summary.txt"
 
 
@@ -69,7 +69,7 @@ rule plot_heterozygosity_vs_depth:
     input:
         merged = f"{config['genhet_dir']}/genhet_vs_depth.txt"
     output:
-        plot = f"{config['genhet_dir']}/genhet_vs_depth.png",
+        plot = f"{config['genhet_dir']}/genhet_vs_depth.pdf",
         results = f"{config['genhet_dir']}/genhet_vs_depth_corr.txt"
     conda: "../../envs/cowplot.yml"
     script:
@@ -84,7 +84,7 @@ rule plot_genhet_barplots:
     input:
         merged = f"{config['genhet_dir']}/genhet_vs_depth.txt"
     output:
-        plot = f"{config['genhet_dir']}/genhet_barplots.png",
+        plot = f"{config['genhet_dir']}/genhet_barplots.pdf",
         summary = f"{config['genhet_dir']}/genhet_summary.txt"
     conda: "../../envs/cowplot.yml"
     script:

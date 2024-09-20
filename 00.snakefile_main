@@ -3,6 +3,7 @@ include: "modules/stacks/02.snakefile_stacks"
 include: "modules/admixture/04.snakefile_admixture"   
 include: "modules/genhet/05.snakefile_genhet"   
 include: "modules/landgen/06.snakefile_landgen"
+include: "modules/feems/07.snakefile_feems"
 
 rule all_main:
     input:
@@ -22,33 +23,39 @@ rule all_main:
      f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.vcf.gz",
      f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.plink.fam",
      f"{config['populations_dir']}/adjusted_pcs.txt",
-     f"{config['populations_dir']}/ABcorrected_Filtered_PCA.png",
-     f"{config['populations_dir']}/ABcorrected_Filtered_MDS.png",
+     f"{config['populations_dir']}/ABcorrected_Filtered_PCA.pdf",
+     f"{config['populations_dir']}/ABcorrected_Filtered_MDS.pdf",
 
     # output files from admixture pipeline
      expand(f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr_K{{K}}.Q", K=K_values),
      expand(f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.Q", K=K_values),
      f"{config['admixture_dir']}/admixture_metrics_CVEsummary.txt",
      f"{config['admixture_dir']}/merged_q_values_summary.txt",
-     f"{config['admixture_dir']}/admixture_barplots.png",
+     f"{config['admixture_dir']}/admixture_barplots.pdf",
 
     # output files from genhet pipeline
      f"{config['genhet_dir']}/genhet_input.txt",
      f"{config['genhet_dir']}/genhet_output.txt",
      f"{config['genhet_dir']}/genhet_vs_depth.txt",
-     f"{config['genhet_dir']}/genhet_vs_depth.png",
+     f"{config['genhet_dir']}/genhet_vs_depth.pdf",
      f"{config['genhet_dir']}/genhet_vs_depth_corr.txt",
-     f"{config['genhet_dir']}/genhet_barplots.png",
+     f"{config['genhet_dir']}/genhet_barplots.pdf",
      f"{config['genhet_dir']}/genhet_summary.txt",
 
     # output from landgen pipeline
      f"{config['landgen_dir']}/pairwise_fst_matrix.csv",
      f"{config['landgen_dir']}/neis_d_matrix.csv",
-     f"{config['landgen_dir']}/pairwise_fst_heatmap.png",
-     f"{config['landgen_dir']}/pairwise_neis_d_heatmap.png",
+     f"{config['landgen_dir']}/pairwise_fst_heatmap.pdf",
+     f"{config['landgen_dir']}/pairwise_neis_d_heatmap.pdf",
      f"{config['landgen_dir']}/sample_coords.csv",
      f"{config['landgen_dir']}/individual_centroids.csv",
      f"{config['landgen_dir']}/merge_popind_centroids.csv",
      f"{config['landgen_dir']}/population_centroids.csv",
-     f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model.png",
-     f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model_Exclude.png"
+     f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model.pdf",
+     f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model_Exclude.pdf",
+
+     # output file from the feems pipeline
+     f"{config['feems_dir']}/smoothed_buffered_polygon_alpha{config['alpha']}_buffer{config['buffer_distance']}.pdf",
+     f"{config['feems_dir']}/feems.outer_alpha{config['alpha']}_buffer{config['buffer_distance']}.txt",
+     f"{config['feems_dir']}/feems.coord",
+     #f"{config['feems_dir']}/output_fitfeems_lam{config['lambda_val']}_SJKF_hexgrid5km_buffer{config['buffer_distance']}.pdf"

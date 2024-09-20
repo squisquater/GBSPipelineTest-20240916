@@ -15,8 +15,8 @@ rule all_stacks:
         f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.vcf.gz",
         f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.plink.fam",
         f"{config['populations_dir']}/adjusted_pcs.txt",
-        f"{config['populations_dir']}/ABcorrected_Filtered_PCA.png",
-        f"{config['populations_dir']}/ABcorrected_Filtered_MDS.png"
+        f"{config['populations_dir']}/ABcorrected_Filtered_PCA.pdf",
+        f"{config['populations_dir']}/ABcorrected_Filtered_MDS.pdf"
 
 rule filter_by_depth:
     resources:
@@ -244,7 +244,7 @@ rule pca_visualization_filtered:
         eigenval = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.eigenval",
         eigenvec = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.eigenvec"
     output:
-        pca_plot = f"{config['populations_dir']}/ABcorrected_Filtered_PCA.png",
+        pca_plot = f"{config['populations_dir']}/ABcorrected_Filtered_PCA.pdf",
     conda: "../../envs/GBS.yml"
     script:
         f"{config['accessory_scripts_dir']}/pca_plot.R"
@@ -257,7 +257,7 @@ rule mds_visualization_filtered:
     input:
         mds = f"{config['populations_dir']}/ABcorrected_filtered_populations.plink.mds"
     output:
-        mds_plot = f"{config['populations_dir']}/ABcorrected_Filtered_MDS.png"
+        mds_plot = f"{config['populations_dir']}/ABcorrected_Filtered_MDS.pdf"
     conda: "../../envs/GBS.yml"
     script:
         f"{config['accessory_scripts_dir']}/mds_plot.R"

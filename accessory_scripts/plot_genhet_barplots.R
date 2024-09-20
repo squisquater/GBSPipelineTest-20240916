@@ -4,6 +4,7 @@
 library(ggplot2)
 library(dplyr)
 library(cowplot)
+library(viridis)  # Add the viridis package for color scaling
 
 # Input and output file paths
 input_file <- snakemake@input$merged
@@ -31,7 +32,7 @@ create_barplot <- function(data, metric) {
     geom_errorbar(aes(ymin = mean_value - sd_value, ymax = mean_value + sd_value), width = 0.2) +
     labs(x = "Population (Region.ID)", y = metric, title = paste("Comparison of", metric)) +
     theme_minimal() +
-    scale_fill_brewer(palette = "Set1") +
+    scale_fill_hue(name = "Population") +  # Use scale_color_hue for discrete colors
     theme(legend.position = "none")
 }
 

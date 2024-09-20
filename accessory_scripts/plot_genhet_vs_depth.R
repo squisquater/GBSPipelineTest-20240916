@@ -21,23 +21,30 @@ metrics <- c("PHt", "Hs_obs", "Hs_exp", "IR", "HL")
 
 # Create a function to run correlation analysis and return statistics
 calculate_stats <- function(df, x_var, y_var) {
-  # Perform linear regression
-  model <- lm(get(y_var) ~ get(x_var), data = df)
-  summary_model <- summary(model)
-  
-  # Extract the slope and p-value
-  slope <- summary_model$coefficients[2, 1]
-  p_value <- summary_model$coefficients[2, 4]
-  r_value <- cor(df[[x_var]], df[[y_var]], use = "complete.obs")
-  
-  return(data.frame(metric = y_var, Region.ID = unique(df$Region.ID), slope = slope, r_value = r_value, p_value = p_value))
+  # Check if the population has more than one representative
+  if (nrow(df) > 1) {
+    # Perform linear regression
+    model <- lm(get(y_var) ~ get(x_var), data = df)
+    summary_model <- summary(model)
+    
+    # Extract the slope and p-value
+    slope <- summary_model$coefficients[2, 1]
+    p_value <- summary_model$coefficients[2, 4]
+    r_value <- cor(df[[x_var]], df[[y_var]], use = "complete.obs")
+    
+    return(data.frame(metric = y_var, Region.ID = unique(df$Region.ID), slope = slope, r_value = r_value, p_value = p_value))
+  } else {
+    # Return NA values for single-representative populations
+    return(data.frame(metric = y_var, Region.ID = unique(df$Region.ID), slope = NA, r_value = NA, p_value = NA))
+  }
 }
 
 # Create individual plots for each metric with color coding for Region.ID (population)
 plot_list <- lapply(metrics, function(metric) {
   ggplot(merged_data, aes(x = GenomeWideAvgDepth, y = get(metric), color = Region.ID)) +
     geom_point() +
-    geom_smooth(method = "lm", se = FALSE) +
+    # Only add a trendline if there is more than one sample per population
+    geom_smooth(method = "lm", se = FALSE, data = function(df) df %>% filter(n() > 1)) +
     labs(x = "Genome-Wide Average Depth", y = metric, title = paste("Depth vs", metric)) +
     theme_minimal() +
     scale_color_discrete(name = "Population")

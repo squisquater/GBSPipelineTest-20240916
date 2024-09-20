@@ -4,6 +4,7 @@ landgen_dir: LandGen
 
 # Exclude populations
 exclude_pops: 
-  [] # < if you don't want to exclude any populations
-  #- Smt  # Example population to exclude
-  #- Bak # Just add more to the list if you want to exclude more populations
+  # [] # < if you don't want to exclude any populations
+  - SmT  # Example population to exclude
+  - Tft # Just add more to the list if you want to exclude more populations
+  - CFl

@@ -15,7 +15,7 @@ rule all_admixture:
         expand(f"{config['admixture_dir']}/ABcorrected_filtered_populations.plink_renamedChr.{{K}}.Q", K=K_values),
         f"{config['admixture_dir']}/admixture_metrics_CVEsummary.txt",
         f"{config['admixture_dir']}/merged_q_values_summary.txt",
-        f"{config['admixture_dir']}/admixture_barplots.png"
+        f"{config['admixture_dir']}/admixture_barplots.pdf"
 
 
 rule rename_chromosomes:
@@ -135,7 +135,7 @@ rule plot_admixture_barplots:
     input:
         summary_file = f"{config['admixture_dir']}/merged_q_values_summary.txt"
     output:
-        output_file = f"{config['admixture_dir']}/admixture_barplots.png"
+        output_file = f"{config['admixture_dir']}/admixture_barplots.pdf"
     params:
         admixture_dir = config['admixture_dir']
     conda: "../../envs/cowplot.yml"

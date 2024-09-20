@@ -6,14 +6,14 @@ config['landgen_dir'] = f"{config['populations_dir']}/{config['landgen_dir']}"
 rule all_LandGen:
     input: f"{config['landgen_dir']}/pairwise_fst_matrix.csv",
         f"{config['landgen_dir']}/neis_d_matrix.csv",
-        f"{config['landgen_dir']}/pairwise_fst_heatmap.png",
-        f"{config['landgen_dir']}/pairwise_neis_d_heatmap.png",
+        f"{config['landgen_dir']}/pairwise_fst_heatmap.pdf",
+        f"{config['landgen_dir']}/pairwise_neis_d_heatmap.pdf",
         #f"{config['landgen_dir']}/sample_coords.csv",
         f"{config['landgen_dir']}/individual_centroids.csv",
         f"{config['landgen_dir']}/merge_popind_centroids.csv",
         f"{config['landgen_dir']}/population_centroids.csv",
-        f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model.png",
-        f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model_Exclude.png"
+        f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model.pdf",
+        f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model_Exclude.pdf"
 
 
 rule generate_distance_matrices:
@@ -27,8 +27,8 @@ rule generate_distance_matrices:
     output: 
         f"{config['landgen_dir']}/pairwise_fst_matrix.csv",
         f"{config['landgen_dir']}/neis_d_matrix.csv",
-        f"{config['landgen_dir']}/pairwise_fst_heatmap.png",
-        f"{config['landgen_dir']}/pairwise_neis_d_heatmap.png"
+        f"{config['landgen_dir']}/pairwise_fst_heatmap.pdf",
+        f"{config['landgen_dir']}/pairwise_neis_d_heatmap.pdf"
     params:
         landgen_dir=config['landgen_dir']
     conda: "../../envs/LandGen.yml"
@@ -107,8 +107,8 @@ rule pop_IBD_analysis:
         fam=f"{config['populations_dir']}/ABcorrected_filtered_populations_ForLandGen.plink.fam",
         pop_centroids=f"{config['landgen_dir']}/population_centroids.csv"
     output:
-        ibd_plot=f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model.png",
-        ibd_plot_exclude=f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model_Exclude.png",
+        ibd_plot=f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model.pdf",
+        ibd_plot_exclude=f"{config['landgen_dir']}/KF_Optimized_Resistance_Distance_Null_Model_Exclude.pdf",
         mantel_result=f"{config['landgen_dir']}/mantel_test_result.txt",
         mantel_result_exclude=f"{config['landgen_dir']}/mantel_test_result_excludePop.txt",
         geo_dist_matrix=f"{config['landgen_dir']}/geo_distance_matrix.csv",

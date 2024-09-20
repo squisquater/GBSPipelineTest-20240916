@@ -8,3 +8,4 @@ dependencies:
   - r-cowplot
   - r-tidyr
   - r-tidyverse  # Optional, includes other helpful tidy packages
+  - r-viridis  # Add this line
